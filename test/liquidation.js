@@ -1,3 +1,6 @@
+//liquidation.js เป็น web3 interphase ที่จะไปเรียก transaction บน ETH blockchain ที่เกี่ยวข้องกับ contract ที่เราจะใช้ 
+//โดยเราต้อง deploy ตัว contract ลงบน ETH blockchain ก่อนถึงจะเรียก transaction มา
+//แต่ใน lab นี้เราไม่ได้จะ deploy ตัว contract ลงบน ETH blockchain จริงๆ แต่เราจะ deploy ไปบน block ที่ fork และ simulate ผ่าน alchemy.com 
 const { expect } = require("chai");
 const { network, ethers } = require("hardhat");
 const { BigNumber, utils }  = require("ethers");
@@ -8,6 +11,7 @@ describe("Liquidation", function () {
     await network.provider.request({
         method: "hardhat_reset",
         params: [{
+          //copy state ของ block ที่ต้องการมาเพื่อทำ simulate
           forking: {
             jsonRpcUrl: process.env.ALCHE_API,
             blockNumber: 12489619,
@@ -15,8 +19,10 @@ describe("Liquidation", function () {
         }]
       });
     
+    //ในความเป็นจริง gasPrice > 0
     const gasPrice = 0;
 
+    //สร้าง account
     const accounts = await ethers.getSigners();
     const liquidator = accounts[0].address;
 
@@ -25,6 +31,7 @@ describe("Liquidation", function () {
         params: [liquidator],
     }));
 
+    //deploy contract "LiquidationOperator" ลงไปบน ETH blockchain
     const LiquidationOperator = await ethers.getContractFactory("LiquidationOperator");
     const liquidationOperator = await LiquidationOperator.deploy(overrides = {gasPrice: gasPrice});
     await liquidationOperator.deployed();
@@ -32,6 +39,11 @@ describe("Liquidation", function () {
     const liquidationTx = await liquidationOperator.operate(overrides = {gasPrice: gasPrice});
     const liquidationReceipt = await liquidationTx.wait();
 
+    //เช็คว่าใน account นี้มี liquidationEvents จริงรึเปล่า ถ้าไม่มี simulate ไปก็ไร้ความหมาย
+    //ส่ง logs ไปบน blockchain database เมื่อเกิด liquidationEvents
+    /**0xe413a321e8681d831f4dbccbca790d2952b56f977908e45be37335533e005286 = Hash ของ 
+    liquidationEvents ของ Aave, สามารถเอาไป seach บน Transaction Details -> ศogs ใน Aave ได้**/
+    //0x7d2768dE32b0b80b7a3454c06BdAc94A69DDc7A9 = address ของ Aave lending pool ที่ contract ภายในมี method liquidationCall() ที่เราเรียกใช้งาน
     const liquidationEvents = liquidationReceipt.logs.filter(
         v => v && v.topics && v.address === '0x7d2768dE32b0b80b7a3454c06BdAc94A69DDc7A9' && Array.isArray(v.topics) && 
         v.topics.length > 3 && v.topics[0] === '0xe413a321e8681d831f4dbccbca790d2952b56f977908e45be37335533e005286')
@@ -41,11 +53,13 @@ describe("Liquidation", function () {
     expect(expectedLiquidationEvents.length, "no expected liquidation").to.be.above(0);
     expect(liquidationEvents.length, "unexpected liquidation").to.be.equal(expectedLiquidationEvents.length);
 
+    //คำนวนกำไร
     const afterLiquidationBalance = BigNumber.from(await hre.network.provider.request({
         method: "eth_getBalance",
         params: [liquidator],
     }));
 
+    //ETH ที่เหลือเป็นกำไร = afterLiquidationBalance(ETH) - beforeLiquidationBalance(ETH)
     const profit = afterLiquidationBalance.sub(beforeLiquidationBalance);
     console.log("Profit", utils.formatEther(profit), "ETH");
 
