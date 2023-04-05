@@ -41,8 +41,8 @@ describe("Liquidation", function () {
 
     //เช็คว่าใน account นี้มี liquidationEvents จริงรึเปล่า ถ้าไม่มี simulate ไปก็ไร้ความหมาย
     //ส่ง logs ไปบน blockchain database เมื่อเกิด liquidationEvents
-    /**0xe413a321e8681d831f4dbccbca790d2952b56f977908e45be37335533e005286 = Hash ของ 
-    liquidationEvents ของ Aave, สามารถเอาไป seach บน Transaction Details -> ศogs ใน Aave ได้**/
+    /** 0xe413a321e8681d831f4dbccbca790d2952b56f977908e45be37335533e005286 = Hash ของ 
+    liquidationEvents ของ Aave, สามารถเอาไป search บน Transaction Details -> Logs ใน Aave ได้**/
     //0x7d2768dE32b0b80b7a3454c06BdAc94A69DDc7A9 = address ของ Aave lending pool ที่ contract ภายในมี method liquidationCall() ที่เราเรียกใช้งาน
     const liquidationEvents = liquidationReceipt.logs.filter(
         v => v && v.topics && v.address === '0x7d2768dE32b0b80b7a3454c06BdAc94A69DDc7A9' && Array.isArray(v.topics) && 
@@ -62,6 +62,10 @@ describe("Liquidation", function () {
     //ETH ที่เหลือเป็นกำไร = afterLiquidationBalance(ETH) - beforeLiquidationBalance(ETH)
     const profit = afterLiquidationBalance.sub(beforeLiquidationBalance);
     console.log("Profit", utils.formatEther(profit), "ETH");
+    
+
+
+
 
     expect(profit.gt(BigNumber.from(0)), "not profitable").to.be.true;
     writeFile('profit.txt', String(utils.formatEther(profit)), function (err) {console.log("failed to write profit.txt: %s", err)});
